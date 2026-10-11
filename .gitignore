@@ -1,0 +1,12 @@
+# OS / 编辑器
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.idea/
+.vscode/
+
+# 工具产物
+node_modules/
+_*.txt
+_*.py

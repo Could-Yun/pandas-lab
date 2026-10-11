@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="可视化 pandas 数据分析工作台：浏览器内运行真实 pandas，操作即生成代码。" />
+  <title data-i18n="docTitle">PandasLab · 可视化数据分析工作台</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23156082'/%3E%3Crect x='14' y='18' width='36' height='6' rx='2' fill='%23fff'/%3E%3Crect x='14' y='29' width='36' height='6' rx='2' fill='%23ffffff' opacity='.7'/%3E%3Crect x='14' y='40' width='22' height='6' rx='2' fill='%23ff9a5a'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./styles.css?v=2" />
+</head>
+<body>
+
+<!-- ===================== 顶栏 ===================== -->
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-text">
+      <b>PandasLab</b>
+      <small data-i18n="brandSub">可视化数据分析工作台</small>
+    </span>
+  </div>
+
+  <div class="source-bar">
+    <label class="src-label" for="datasetSelect" data-i18n="dataSource">数据源</label>
+    <select id="datasetSelect" class="select"></select>
+    <button class="btn" id="uploadBtn" type="button" data-i18n="upload">⬆ 上传</button>
+    <input type="file" id="fileInput" accept=".csv,.tsv,.txt,.json" hidden />
+    <button class="btn" id="urlBtn" type="button" data-i18n="fromUrl">🔗 URL</button>
+    <button class="btn" id="pasteBtn" type="button" data-i18n="paste">📋 粘贴</button>
+  </div>
+
+  <div class="topbar-right">
+    <div class="engine" id="engineBadge" title="">
+      <span class="engine-dot" id="engineDot"></span>
+      <span class="engine-text" id="engineText" data-i18n="engineBooting">引擎加载中</span>
+      <span class="engine-bar"><i id="engineBar"></i></span>
+    </div>
+    <button class="lang-toggle" id="langToggle" type="button" data-i18n="langBtn">EN</button>
+  </div>
+</header>
+
+<!-- ===================== 主体三栏 ===================== -->
+<main class="workbench">
+
+  <!-- 左：管道 -->
+  <aside class="rail" id="pipelineRail">
+    <div class="rail-head">
+      <h2 data-i18n="pipeline">操作管道</h2>
+      <div class="rail-actions">
+        <button class="icon-btn" id="undoBtn" type="button" title="撤销" disabled>↶</button>
+        <button class="icon-btn" id="redoBtn" type="button" title="重做" disabled>↷</button>
+        <button class="icon-btn" id="savePipeBtn" type="button" title="保存管道">⭳</button>
+        <button class="icon-btn" id="loadPipeBtn" type="button" title="载入管道">⭱</button>
+        <input type="file" id="pipeFileInput" accept=".json" hidden />
+        <button class="icon-btn" id="clearPipeBtn" type="button" title="清空管道">⌫</button>
+        <span class="rail-count" id="pipelineCount">0</span>
+      </div>
+    </div>
+    <div class="pipeline" id="pipeline"></div>
+    <button class="add-step" id="addStepBtn" type="button">
+      <span aria-hidden="true">＋</span> <span data-i18n="addStep">添加操作</span>
+    </button>
+  </aside>
+
+  <!-- 中：数据表格 -->
+  <section class="center">
+    <div class="table-toolbar">
+      <div class="shape" id="shapeInfo">
+        <span class="shape-main" id="shapeMain">—</span>
+        <span class="shape-sub" id="shapeSub"></span>
+      </div>
+      <div class="toolbar-right">
+        <input type="search" id="colFilter" class="mini-input" data-i18n-placeholder="filterCols" placeholder="筛选列…" />
+        <button class="btn ghost" id="profileBtn" type="button" data-i18n="profile">数据体检</button>
+        <button class="btn ghost" id="exportBtn" type="button" data-i18n="export">导出</button>
+      </div>
+    </div>
+
+    <div class="table-wrap" id="tableWrap">
+      <div class="table-head" id="tableHead"></div>
+      <div class="table-body" id="tableBody">
+        <div class="table-spacer" id="tableSpacer"></div>
+        <div class="table-rows" id="tableRows"></div>
+      </div>
+      <div class="table-empty" id="tableEmpty" data-i18n="loadingData">正在载入数据…</div>
+    </div>
+  </section>
+
+  <!-- 右：检视 -->
+  <aside class="inspector" id="inspector">
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="column" role="tab" data-i18n="tabColumn">列统计</button>
+      <button class="tab" data-tab="chart" role="tab" data-i18n="tabChart">图表</button>
+      <button class="tab" data-tab="code" role="tab" data-i18n="tabCode">代码</button>
+    </div>
+
+    <div class="tab-panel active" id="panel-column">
+      <p class="hint" data-i18n="colHint">点击表格列头查看该列的详细统计。</p>
+    </div>
+
+    <div class="tab-panel" id="panel-chart">
+      <p class="hint" data-i18n="chartHint">选择列后这里会自动推荐合适的图表。</p>
+    </div>
+
+    <div class="tab-panel" id="panel-code">
+      <div class="code-head">
+        <span data-i18n="generatedCode">生成的 pandas 代码</span>
+        <div class="code-actions">
+          <button class="btn ghost sm" id="copyCodeBtn" type="button" data-i18n="copy">复制</button>
+          <button class="btn ghost sm" id="downloadCodeBtn" type="button" data-i18n="downloadPy">下载 .py</button>
+        </div>
+      </div>
+      <pre class="code" id="codeView"></pre>
+    </div>
+  </aside>
+
+</main>
+
+<!-- 轻量提示条 -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="./assets/vendor/echarts.min.js"></script>
+<script type="module" src="./app.js?v=2"></script>
+</body>
+</html>
