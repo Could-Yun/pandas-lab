@@ -244,19 +244,42 @@ def ch_scatter(x, y, color=None, limit=4000):
         out["groups"] = [str(g) for g in sub[color].astype("object").unique()[:12]]
     return out
 
+def _box_stats(v):
+    """返回 [下须, Q1, 中位数, Q3, 上须] 与离群点，按 1.5×IQR 规则"""
+    q1, med, q3 = v.quantile(.25), v.quantile(.5), v.quantile(.75)
+    iqr = q3 - q1
+    inner_lo, inner_hi = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+    within = v[(v >= inner_lo) & (v <= inner_hi)]
+    lo = within.min() if len(within) else v.min()
+    hi = within.max() if len(within) else v.max()
+    out = v[(v < inner_lo) | (v > inner_hi)]
+    return [lo, q1, med, q3, hi], out
+
 def ch_box_by(cat, num, max_groups=12):
+    # cat 为 None 时画单个箱（不分组）——对应"选中一个数值列"的场景
+    if cat is None:
+        v = _cur()[num].dropna().astype(float)
+        if len(v) == 0:
+            return {"groups": [], "box": [], "outliers": []}
+        stats, out = _box_stats(v)
+        return {
+            "groups": [str(num)],
+            "box": [[_jsonable(x) for x in stats]],
+            "outliers": [[0, _jsonable(o)] for o in out.head(60)],
+        }
+
     df = _cur()[[cat, num]].dropna()
     groups, data, outliers = [], [], []
     for i, (g, sub) in enumerate(df.groupby(cat, dropna=False)):
         if i >= max_groups:
             break
         v = sub[num].astype(float)
-        q1, med, q3 = v.quantile(.25), v.quantile(.5), v.quantile(.75)
-        iqr = q3 - q1
-        lo, hi = v[v >= q1 - 1.5 * iqr].min(), v[v <= q3 + 1.5 * iqr].max()
+        if len(v) == 0:
+            continue
+        stats, out = _box_stats(v)
         groups.append(str(g))
-        data.append([_jsonable(lo), _jsonable(q1), _jsonable(med), _jsonable(q3), _jsonable(hi)])
-        for ov in v[(v < q1 - 1.5 * iqr) | (v > q3 + 1.5 * iqr)].head(40):
+        data.append([_jsonable(x) for x in stats])
+        for ov in out.head(40):
             outliers.append([len(groups) - 1, _jsonable(ov)])
     return {"groups": groups, "box": data, "outliers": outliers}
 
@@ -415,15 +438,23 @@ json.dumps(_out)
   /** 图表数据：统一入口，kind 决定调用哪个聚合函数 */
   async chart({ kind, args }) {
     const a = args || {};
+    // JS 的 null/undefined 经 JSON.stringify 会变成字符串 "null"，
+    // 拼进 Python 代码就是未定义的标识符。统一用这个转换器生成合法字面量。
+    const lit = (v) => {
+      if (v === null || v === undefined) return "None";
+      if (typeof v === "boolean") return v ? "True" : "False";
+      if (typeof v === "number") return Number.isFinite(v) ? String(v) : "None";
+      return JSON.stringify(String(v));
+    };
     const call = {
-      histogram:    () => `ch_histogram(${JSON.stringify(a.col)}, ${a.bins || 30})`,
-      valueCounts:  () => `ch_value_counts(${JSON.stringify(a.col)}, ${a.top || 20})`,
-      scatter:      () => `ch_scatter(${JSON.stringify(a.x)}, ${JSON.stringify(a.y)}, ${a.color ? JSON.stringify(a.color) : "None"})`,
-      box:          () => `ch_box_by(${JSON.stringify(a.cat)}, ${JSON.stringify(a.num)})`,
-      aggBar:       () => `ch_agg_bar(${JSON.stringify(a.cat)}, ${JSON.stringify(a.num)}, ${JSON.stringify(a.how || "mean")})`,
-      line:         () => `ch_line(${JSON.stringify(a.x)}, ${JSON.stringify(a.y)}, ${JSON.stringify(a.how || "mean")})`,
-      crosstab:     () => `ch_crosstab(${JSON.stringify(a.a)}, ${JSON.stringify(a.b)})`,
-      corr:         () => `ch_corr(${JSON.stringify(a.method || "pearson")})`,
+      histogram:    () => `ch_histogram(${lit(a.col)}, ${a.bins || 30})`,
+      valueCounts:  () => `ch_value_counts(${lit(a.col)}, ${a.top || 20})`,
+      scatter:      () => `ch_scatter(${lit(a.x)}, ${lit(a.y)}, ${lit(a.color)})`,
+      box:          () => `ch_box_by(${lit(a.cat)}, ${lit(a.num)})`,
+      aggBar:       () => `ch_agg_bar(${lit(a.cat)}, ${lit(a.num)}, ${lit(a.how || "mean")})`,
+      line:         () => `ch_line(${lit(a.x)}, ${lit(a.y)}, ${lit(a.how || "mean")})`,
+      crosstab:     () => `ch_crosstab(${lit(a.a)}, ${lit(a.b)})`,
+      corr:         () => `ch_corr(${lit(a.method || "pearson")})`,
       missing:      () => `ch_missing()`,
       profile:      () => `ch_profile()`,
     }[kind];
