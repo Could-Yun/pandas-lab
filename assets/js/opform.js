@@ -3,7 +3,7 @@
  * 表单结构完全由 ops.js 的 fields 声明驱动，新增操作不用改这里。
  * ============================================================= */
 
-import { OPS, CATEGORIES } from "./ops.js?v=2";
+import { OPS, CATEGORIES } from "./ops.js?v=3";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (m) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
