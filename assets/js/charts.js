@@ -115,17 +115,52 @@ export function buildOption(type, data, cols, t) {
       };
 
     case "scatter": {
-      const pts = data.x.map((v, i) => [v, data.y[i]]);
+      // 散点图要同时支持「数值×数值」和「类别×数值」两种情况。
+      // 类别轴用 value 轴 + 索引映射来实现，这样才能加抖动（jitter）——
+      // 否则同一类别的点会全部叠在一条直线上，完全看不出分布。
+      const isCat = (c) => c && c.kind !== "number";
+      const catAxis = (vals) => {
+        const seen = [];
+        vals.forEach((v) => { const s = String(v); if (!seen.includes(s)) seen.push(s); });
+        return seen;
+      };
+      const xCat = isCat(a) ? catAxis(data.x) : null;
+      const yCat = isCat(b) ? catAxis(data.y) : null;
+      const JIT = 0.34;                      // 抖动幅度（类目间距的比例）
+      const jitter = () => (Math.random() - 0.5) * 2 * JIT;
+
+      const pts = data.x.map((vx, i) => {
+        const vy = data.y[i];
+        const px = xCat ? xCat.indexOf(String(vx)) + (yCat ? 0 : jitter()) : vx;
+        const py = yCat ? yCat.indexOf(String(vy)) + jitter() : vy;
+        return [px, py, vx, vy];             // 后两位保留原值，供 tooltip 显示
+      });
+
+      const mkAxis = (name, cats, isX) => cats
+        ? {
+            type: "value", name, min: -0.6, max: cats.length - 0.4, interval: 1,
+            nameLocation: isX ? "middle" : undefined, nameGap: isX ? 26 : undefined,
+            nameTextStyle: { fontSize: 10, color: C.faint },
+            ...axisStyle,
+            axisLabel: { ...axisStyle.axisLabel,
+              formatter: (v) => (Number.isInteger(v) && cats[v] != null ? cats[v] : "") },
+            splitLine: { show: false },
+          }
+        : {
+            type: "value", name, scale: true,
+            nameLocation: isX ? "middle" : undefined, nameGap: isX ? 26 : undefined,
+            nameTextStyle: { fontSize: 10, color: C.faint }, ...axisStyle,
+          };
+
       return {
         ...base(),
         tooltip: { trigger: "item", confine: true,
-          formatter: (p) => `${a.name}: ${p.value[0]}<br/>${b.name}: ${p.value[1]}` },
-        xAxis: { type: "value", name: a.name, nameLocation: "middle", nameGap: 26,
-          nameTextStyle: { fontSize: 10, color: C.faint }, scale: true, ...axisStyle },
-        yAxis: { type: "value", name: b.name, nameTextStyle: { fontSize: 10, color: C.faint },
-          scale: true, ...axisStyle },
-        series: [{ type: "scatter", data: pts, symbolSize: 5,
-          itemStyle: { color: C.accent, opacity: .55 } }],
+          formatter: (p) => `${a.name}: ${p.value[2]}<br/>${b.name}: ${p.value[3]}` },
+        xAxis: mkAxis(a.name, xCat, true),
+        yAxis: mkAxis(b.name, yCat, false),
+        series: [{ type: "scatter", data: pts,
+          symbolSize: xCat || yCat ? 4 : 5,
+          itemStyle: { color: C.accent, opacity: xCat || yCat ? 0.38 : 0.55 } }],
       };
     }
 
