@@ -6,7 +6,7 @@
  * 因此改动靠后的步骤几乎是瞬时的。
  * ============================================================= */
 
-import { OPS, stepCode, pipelineCode } from "./ops.js?v=2";
+import { OPS, stepCode, pipelineCode } from "./ops.js?v=3";
 
 /* FNV-1a 32 位哈希：短、快、碰撞率对本场景足够 */
 function hash32(str) {

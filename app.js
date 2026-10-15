@@ -8,14 +8,14 @@
  *      覆盖预览期的推断值，并把表格数据源切到 pandas 后端
  * ============================================================= */
 
-import { Engine } from "./assets/js/engine.js?v=2";
-import { parseCSV, guessKinds, previewStats } from "./assets/js/csv.js?v=2";
-import { DataTable } from "./assets/js/table.js?v=2";
-import { I18n, DATASET_LABELS } from "./assets/js/i18n.js?v=2";
-import { Pipeline } from "./assets/js/pipeline.js?v=2";
-import { OPS } from "./assets/js/ops.js?v=2";
-import { openOpPicker, openOpForm } from "./assets/js/opform.js?v=2";
-import { suggest, buildRequest, buildOption, corrOption, missingOption } from "./assets/js/charts.js?v=2";
+import { Engine } from "./assets/js/engine.js?v=3";
+import { parseCSV, guessKinds, previewStats } from "./assets/js/csv.js?v=3";
+import { DataTable } from "./assets/js/table.js?v=3";
+import { I18n, DATASET_LABELS } from "./assets/js/i18n.js?v=3";
+import { Pipeline } from "./assets/js/pipeline.js?v=3";
+import { OPS } from "./assets/js/ops.js?v=3";
+import { openOpPicker, openOpForm } from "./assets/js/opform.js?v=3";
+import { suggest, buildRequest, buildOption, corrOption, missingOption } from "./assets/js/charts.js?v=3";
 
 const $ = (id) => document.getElementById(id);
 
@@ -33,7 +33,7 @@ const BUILTIN = [
 const DEFAULT_DATASET = "titanic";
 
 const i18n = new I18n();
-const engine = new Engine("./worker.js");
+const engine = new Engine("./worker.js?v=3");
 
 /** 全局状态 */
 const state = {
@@ -733,7 +733,9 @@ function bindUI() {
     const f = e.target.files[0];
     if (!f) return;
     const text = await f.text();
-    const name = f.name.replace(/\.[^.]+$/, "").replace(/[^\w]/g, "_") || "uploaded";
+    // \w 不含中文，直接用会把汉字全替换成下划线，生成的代码变成
+    // pd.read_csv("_____.csv")。改用 Unicode 属性类，保留各语言文字与数字。
+    const name = f.name.replace(/\.[^.]+$/, "").replace(/[^\p{L}\p{N}_]/gu, "_") || "uploaded";
     setCSV(name, text);
     toast(`${f.name} · ${(f.size / 1024).toFixed(0)} KB`);
   });
@@ -805,7 +807,7 @@ function bindUI() {
     const f = e.dataTransfer.files[0];
     if (!f) return;
     const text = await f.text();
-    setCSV(f.name.replace(/\.[^.]+$/, "").replace(/[^\w]/g, "_"), text);
+    setCSV(f.name.replace(/\.[^.]+$/, "").replace(/[^\p{L}\p{N}_]/gu, "_") || "uploaded", text);
   });
 }
 
