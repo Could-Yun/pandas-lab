@@ -1,0 +1,17 @@
+# OS / 编辑器
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.idea/
+.vscode/
+
+# 工具产物
+node_modules/
+_*.txt
+_*.py
+
+# 交付物不进源码包（视频/压缩包体积大且与源码无关）
+*.mp4
+*.zip
+_demo_upload.csv
